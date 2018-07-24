@@ -40,4 +40,9 @@ $(function() {
       windowMargin: skel.breakpoint("small").active ? 5 : 50
     });
   });
+
+  // makes the avatar spin when clicked, as a fun little easter egg
+  $(".avatar").click(function() {
+    $(".avatar").toggleClass("spin");
+  });
 });

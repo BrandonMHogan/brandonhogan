@@ -148,6 +148,15 @@ body {
   box-sizing: border-box;
 }
 
+/* Animations */
+.flip {
+  transform: rotate(-180deg);
+}
+
+.spin {
+  transform: rotate(360deg);
+}
+
 /* Grid */
 
 .row {
@@ -2765,12 +2774,6 @@ body.is-covered #wrapper {
   padding: 0.5em;
   border: solid 1px rgba(46, 89, 80, 1);
   background-color: rgba(46, 89, 80, 0.15);
-}
-
-#header .avatar img {
-  border-radius: 100%;
-  display: block;
-  width: 11em;
 
   -webkit-transition-duration: 1s;
   -moz-transition-duration: 1s;
@@ -2780,6 +2783,12 @@ body.is-covered #wrapper {
   -moz-transition-property: -moz-transform;
   -o-transition-property: -o-transform;
   transition-property: transform;
+}
+
+#header .avatar img {
+  border-radius: 100%;
+  display: block;
+  width: 11em;
 }
 
 @media screen and (max-width: 1280px) {
