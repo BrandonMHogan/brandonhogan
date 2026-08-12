@@ -1,1 +1,3 @@
 blog/
+dist/
+node_modules/
