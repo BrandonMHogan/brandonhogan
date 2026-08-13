@@ -36,6 +36,19 @@ Polish every building progression interaction in the wide kingdom prototype with
 - Loading the page initially at a mobile width must also start directly in narrow mode.
 - Returning from mobile width to desktop width must rebuild the wide progression background for the current saved state and restore every anchor to the wide artwork.
 - Mobile and desktop must preserve the same progression state, crossfade rules, and interaction availability.
+- In narrow mode, the sun and moon are smaller and their complete arc remains inside the upper sky, clear of playable terrain and building controls.
+
+## Night lighting
+
+- Remove the broad circular glow around the Town.
+- When the Town is built, small warm lights align with its visible windows and fade in at night, then fade out at dawn.
+- Window lights remain anchored through resizing and mode changes and must not illuminate an unbuilt Town.
+
+## Site-specific presentation
+
+- Lumber Camp uses separate pre-build and post-build anchors. Its post-build worker controls sit slightly below the approved pre-build prompt.
+- The narrow pre-build Castle prompt is anchored directly to the hilltop construction site.
+- Once the Castle is built, no Castle-complete control or message remains on either layout.
 
 ## Hit areas
 
@@ -63,3 +76,4 @@ Polish every building progression interaction in the wide kingdom prototype with
 - The full automated test suite, production build, and diff checks must pass.
 - Desktop browser verification must cover a fresh Farm restoration, a normal Farm gather, and at least one later building transition.
 - Browser verification must also resize an already-running desktop session into Chrome mobile dimensions and back, confirming that the background and all anchored elements switch modes together.
+- Night browser verification must confirm there is no Town glow circle, Town windows illuminate only when built at night, and mobile celestial bodies stay within the upper sky.
