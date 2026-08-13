@@ -12,6 +12,6 @@ export const getVisibleWorldControls = (state: GameState): WorldControlName[] =>
   else return [...controls, "town"];
   if (state.unlocked.quarry) controls.push("quarry");
   else return [...controls, "quarry"];
-  controls.push("castle");
+  if (!state.unlocked.castle) controls.push("castle");
   return controls;
 };

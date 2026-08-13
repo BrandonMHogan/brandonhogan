@@ -11,4 +11,10 @@ describe("world control visibility", () => {
     const state = { ...createInitialState(), farmRestored: true };
     expect(getVisibleWorldControls(state)).toEqual(["farm", "lumberCamp"]);
   });
+
+  it("removes the Castle control after the Castle is built", () => {
+    const initial = createInitialState();
+    const state = { ...initial, farmRestored: true, unlocked: { farm: true as const, lumberCamp: true, town: true, quarry: true, castle: true } };
+    expect(getVisibleWorldControls(state)).toEqual(["farm", "lumberCamp", "town", "quarry"]);
+  });
 });

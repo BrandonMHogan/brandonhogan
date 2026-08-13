@@ -81,7 +81,7 @@ const wide = (): WorldLayout => {
       town: { x: 0.55, y: 0.76 }, quarry: { x: 0.76, y: 0.76 }, castle: { x: 0.73, y: 0.52 },
     },
     controls: {
-      farm: { x: 0.32, y: 0.9 }, lumberCamp: { x: 0.38, y: 0.625 },
+      farm: { x: 0.32, y: 0.9 }, lumberCamp: { x: 0.38, y: 0.64 },
       town: { x: 0.55, y: 0.82 }, quarry: { x: 0.76, y: 0.82 }, castle: { x: 0.73, y: 0.44 },
     },
     buildControls: {
@@ -128,7 +128,7 @@ const narrow = (): WorldLayout => {
     },
     buildControls: {
       lumberCamp: { x: 0.2, y: 0.38 }, town: { x: 0.5, y: 0.52 },
-      quarry: { x: 0.71, y: 0.68 }, castle: { x: 0.73, y: 0.31 },
+      quarry: { x: 0.71, y: 0.68 }, castle: { x: 0.73, y: 0.46 },
     },
     farmRestorePrompt: { x: 0.17, y: 0.61 },
     hitAreas: {

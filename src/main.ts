@@ -104,7 +104,7 @@ const render = () => {
       ? `<span class="town-full">Town is full · ${MAX_VILLAGERS}/${MAX_VILLAGERS}</span>`
       : `<button data-recruit="true" ${state.resources.food < getRecruitCost(state) ? "disabled" : ""}>Recruit · ${getRecruitCost(state)} food</button>`}</div>` : nextLocked?.[0] === "town" ? buildControl(...nextLocked) : "",
     state.unlocked.quarry ? workerControl("quarry", "Quarry") : nextLocked?.[0] === "quarry" ? buildControl(...nextLocked) : "",
-    state.unlocked.castle ? `<div class="site-control site-castle" ${positioned("castle")}><strong>Castle complete</strong><small>Your tiny kingdom prospers.</small></div>` : nextLocked?.[0] === "castle" ? buildControl(...nextLocked) : "",
+    !state.unlocked.castle && nextLocked?.[0] === "castle" ? buildControl(...nextLocked) : "",
   ].join("").replaceAll('class="site-control ', `class="site-control${entering} `);
   if (markup !== lastControlsMarkup) { controls.innerHTML = markup; lastControlsMarkup = markup; }
 };

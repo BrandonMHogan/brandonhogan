@@ -39,7 +39,7 @@ export class KingdomScene extends Phaser.Scene {
   private villagers = new Map<string, VillagerView>();
   private nightOverlay?: Phaser.GameObjects.Rectangle;
   private stars?: Phaser.GameObjects.Container;
-  private townGlow?: Phaser.GameObjects.Arc;
+  private townWindowLights?: Phaser.GameObjects.Container;
   private isNight = false;
   private resizeTimer?: Phaser.Time.TimerEvent;
 
@@ -166,8 +166,7 @@ export class KingdomScene extends Phaser.Scene {
     this.stars = this.add.container(0, 0).setDepth(30).setAlpha(0);
     for (let index = 0; index < 34; index += 1) this.stars.add(this.add.rectangle((index * 83) % width, 18 + ((index * 47) % Math.max(40, height * .38)), index % 4 === 0 ? 2 : 1, index % 4 === 0 ? 2 : 1, 0xfff1bd));
     this.nightOverlay = this.add.rectangle(0, 0, width, height, 0x101b3d, 0).setOrigin(0).setDepth(25);
-    const town = projectWorldPoint(layout.sites.town, { width, height }, mode);
-    this.townGlow = this.add.circle(town.x, town.y - 10, projection.mapHeight * .1, 0xffb84d, 0).setDepth(26);
+    this.drawTownWindowLights(mode);
   }
 
   update(time: number, delta: number): void {
@@ -180,7 +179,7 @@ export class KingdomScene extends Phaser.Scene {
     const active = this.isNight ? this.moon : this.sun;
     const inactive = this.isNight ? this.sun : this.moon;
     if (active) {
-      const position = getCelestialPosition(progress, width, height);
+      const position = getCelestialPosition(progress, width, height, getWorldMode(width));
       active.setPosition(position.x, position.y).setAlpha(1);
     }
     inactive?.setAlpha(0);
@@ -188,6 +187,7 @@ export class KingdomScene extends Phaser.Scene {
 
   private drawSky(): void {
     const { width, height } = this.scale;
+    const mode = getWorldMode(width);
     const cloudConfig = [
       { texture: 0, x: .08, y: .18, scale: .62, speed: 2.4 }, { texture: 2, x: .58, y: .13, scale: .54, speed: 2.1 },
       { texture: 1, x: .84, y: .27, scale: .56, speed: 2.7 }, { texture: 3, x: .24, y: .36, scale: .7, speed: 5.2 },
@@ -197,8 +197,24 @@ export class KingdomScene extends Phaser.Scene {
       const image = this.add.image(width * x, height * y, `cloud-${texture}`).setScale(scale).setAlpha(index < 3 ? .6 : .84).setDepth(3);
       return { image, speed };
     });
-    this.sun = this.add.image(0, 0, "sun").setScale(.52).setDepth(2);
-    this.moon = this.add.image(0, 0, "moon").setScale(.5).setDepth(2).setAlpha(0);
+    const celestialScale = mode === "narrow" ? .3 : .52;
+    this.sun = this.add.image(0, 0, "sun").setScale(celestialScale).setDepth(2);
+    this.moon = this.add.image(0, 0, "moon").setScale(mode === "narrow" ? .29 : .5).setDepth(2).setAlpha(0);
+  }
+
+  private drawTownWindowLights(mode: "wide" | "narrow"): void {
+    const { width, height } = this.scale;
+    const layout = getWorldLayout(mode);
+    const offsets = mode === "wide"
+      ? [{ x: -.035, y: -.028 }, { x: -.012, y: -.034 }, { x: .014, y: -.026 }, { x: .036, y: -.032 }]
+      : [{ x: -.018, y: -.022 }, { x: .008, y: -.026 }, { x: .026, y: -.018 }];
+    this.townWindowLights = this.add.container(0, 0).setDepth(26).setAlpha(0);
+    offsets.forEach((offset) => {
+      const point = projectWorldPoint({ x: layout.sites.town.x + offset.x, y: layout.sites.town.y + offset.y }, { width, height }, mode);
+      const light = this.add.rectangle(point.x, point.y, mode === "wide" ? 7 : 5, mode === "wide" ? 5 : 4, 0xffd36a, 1)
+        .setStrokeStyle(2, 0x8a4f1d, .8);
+      this.townWindowLights?.add(light);
+    });
   }
 
   private createAnimations(): void {
@@ -297,7 +313,11 @@ export class KingdomScene extends Phaser.Scene {
     this.options.onWorkStatus(false);
     this.tweens.add({ targets: this.nightOverlay, fillAlpha: night ? .55 : 0, duration: 1800 });
     this.tweens.add({ targets: this.stars, alpha: night ? .9 : 0, duration: 1800 });
-    this.tweens.add({ targets: this.townGlow, fillAlpha: night && this.currentState.unlocked.town ? .28 : 0, duration: 1500 });
+    this.tweens.add({
+      targets: this.townWindowLights,
+      alpha: night && this.currentState.unlocked.town ? 1 : 0,
+      duration: this.options.reducedMotion ? 0 : 1200,
+    });
     this.options.onPhase(night ? "Night" : "Day");
   }
 

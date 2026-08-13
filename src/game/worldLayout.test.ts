@@ -16,7 +16,7 @@ describe("world layout", () => {
   it("places wide controls beside their landmarks on readable terrain", () => {
     const controls = getWorldLayout("wide").controls;
     expect(controls.farm).toEqual({ x: 0.32, y: 0.9 });
-    expect(controls.lumberCamp).toEqual({ x: 0.38, y: 0.625 });
+    expect(controls.lumberCamp).toEqual({ x: 0.38, y: 0.64 });
     expect(controls.town).toEqual({ x: 0.55, y: 0.82 });
     expect(controls.quarry).toEqual({ x: 0.76, y: 0.82 });
     expect(controls.castle).toEqual({ x: 0.73, y: 0.44 });
@@ -136,6 +136,12 @@ describe("world layout", () => {
   it("moves the narrow castle controls with the castle", () => {
     const layout = getWorldLayout("narrow");
     expect(layout.controls.castle).toEqual({ x: 0.73, y: 0.44 });
-    expect(layout.buildControls.castle).toEqual({ x: 0.73, y: 0.31 });
+    expect(layout.buildControls.castle).toEqual({ x: 0.73, y: 0.46 });
+  });
+
+  it("places built Lumber Camp controls slightly below its build prompt", () => {
+    const layout = getWorldLayout("wide");
+    expect(layout.buildControls.lumberCamp).toEqual({ x: 0.38, y: 0.625 });
+    expect(layout.controls.lumberCamp).toEqual({ x: 0.38, y: 0.64 });
   });
 });
