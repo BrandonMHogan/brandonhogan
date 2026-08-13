@@ -39,3 +39,20 @@ Preview the production build locally:
 ```sh
 npm run preview
 ```
+
+## Kingdom prototype
+
+The homepage includes an interactive retro-fantasy kingdom behind Brandon's
+profile. Click unlocked resource locations to gather manually. Build the lumber
+camp and town, recruit villagers, then assign them with the plus and minus
+controls to automate production. The accelerated day/night cycle gathers every
+visible villager at the lit town after dark.
+
+Progress is saved in browser-local storage. The Reset control clears only the
+kingdom save after confirmation.
+
+The current Phaser scene uses custom 16-bit-style prototype maps and sprites in
+`public/assets/game/kingdom/`. Asset provenance is documented in that folder.
+The repository also retains Kenney's CC0 Tiny Town sheet for reference; its
+original license is preserved at
+`public/assets/game/kenney-tiny-town/LICENSE.txt`.
