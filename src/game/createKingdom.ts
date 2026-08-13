@@ -8,7 +8,7 @@ export interface KingdomController {
 
 export const createKingdom = async (
   mount: HTMLElement,
-  options: { getState: () => GameState; onGather: (location: Exclude<WorkLocation, "idle">) => void; onPhase: (phase: string) => void; onWorkStatus: (working: boolean) => void; reducedMotion: boolean },
+  options: { getState: () => GameState; onGather: (location: Exclude<WorkLocation, "idle">) => void; onPhase: (phase: string) => void; onWorkStatus: (working: boolean) => void; onReady: () => void; reducedMotion: boolean },
 ): Promise<KingdomController> => {
   const [{ default: Phaser }, { KingdomScene }] = await Promise.all([import("phaser"), import("./KingdomScene")]);
   const scene = new KingdomScene(options);

@@ -5,6 +5,7 @@ import { loadGame, resetGame, saveGame } from "./game/storage";
 import { getWorldLayout, getWorldMode, projectWorldPoint, type SiteName } from "./game/worldLayout";
 import { getVisibleWorldControls } from "./game/controlVisibility";
 import { CONTROL_REVEAL_DELAY_MS, getProgressionStage } from "./game/interactionMotion";
+import { revealKingdom } from "./game/initialReveal";
 
 const $ = <T extends HTMLElement>(selector: string): T => {
   const element = document.querySelector<T>(selector);
@@ -14,6 +15,7 @@ const $ = <T extends HTMLElement>(selector: string): T => {
 
 const controls = $("#controls");
 const gameMount = $("#game");
+const shell = $(".kingdom-shell");
 const status = $("#status");
 const values = {
   food: $("#food"), wood: $("#wood"), stone: $("#stone"), population: $("#population"),
@@ -154,6 +156,7 @@ createKingdom(gameMount, {
     workersAtWork = false;
   },
   onWorkStatus: (working) => { workersAtWork = working; },
+  onReady: () => requestAnimationFrame(() => revealKingdom(shell)),
 }).then((controller) => { kingdom = controller; controller.updateState(state); }).catch((error) => {
   console.error(error);
   status.textContent = "The kingdom could not start, but Brandon's profile is still available.";

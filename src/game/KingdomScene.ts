@@ -10,6 +10,7 @@ interface SceneOptions {
   onGather: (location: Exclude<WorkLocation, "idle">) => void;
   onPhase: (phase: string) => void;
   onWorkStatus: (working: boolean) => void;
+  onReady: () => void;
   reducedMotion: boolean;
 }
 
@@ -91,6 +92,7 @@ export class KingdomScene extends Phaser.Scene {
     } });
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this));
+    this.options.onReady();
   }
 
   syncState(state: GameState): void {
