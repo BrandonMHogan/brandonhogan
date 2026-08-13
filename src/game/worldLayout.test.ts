@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createWorkerRoute, getBuildingHeight, getWorldLayout, getWorldProjection, PHASE_DURATION_MS, projectWorldPoint } from "./worldLayout";
+import { createWorkerRoute, getBuildingHeight, getWorldLayout, getWorldMode, getWorldProjection, PHASE_DURATION_MS, projectWorldPoint } from "./worldLayout";
 
 describe("world layout", () => {
   it.each(["wide", "narrow"] as const)("keeps every site inside the %s artboard", (mode) => {
@@ -15,13 +15,33 @@ describe("world layout", () => {
 
   it("places wide controls beside their landmarks on readable terrain", () => {
     const controls = getWorldLayout("wide").controls;
-    expect(controls.farm).toEqual({ x: 0.23, y: 0.86 });
-    expect(controls.lumberCamp).toEqual({ x: 0.29, y: 0.63 });
+    expect(controls.farm).toEqual({ x: 0.32, y: 0.9 });
+    expect(controls.lumberCamp).toEqual({ x: 0.38, y: 0.625 });
     expect(controls.town).toEqual({ x: 0.55, y: 0.82 });
-    expect(controls.quarry).toEqual({ x: 0.84, y: 0.79 });
+    expect(controls.quarry).toEqual({ x: 0.76, y: 0.82 });
     expect(controls.castle).toEqual({ x: 0.73, y: 0.44 });
-    expect(getWorldLayout("wide").buildControls.quarry).toEqual({ x: 0.76, y: 0.68 });
+    expect(getWorldLayout("wide").buildControls.quarry).toEqual({ x: 0.76, y: 0.72 });
     expect(getWorldLayout("wide").buildControls.castle).toEqual({ x: 0.73, y: 0.42 });
+  });
+
+  it("uses one shared breakpoint for DOM and Phaser layouts", () => {
+    expect(getWorldMode(679)).toBe("narrow");
+    expect(getWorldMode(680)).toBe("wide");
+  });
+
+  it.each(["wide", "narrow"] as const)("keeps every %s hit footprint on its artwork", (mode) => {
+    Object.values(getWorldLayout(mode).hitAreas).forEach(({ center, width, height }) => {
+      expect(center.x - width / 2).toBeGreaterThanOrEqual(0);
+      expect(center.x + width / 2).toBeLessThanOrEqual(1);
+      expect(center.y - height / 2).toBeGreaterThanOrEqual(0);
+      expect(center.y + height / 2).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it("covers most of the wide Farm and centers Lumber Camp interaction", () => {
+    const { hitAreas, sites } = getWorldLayout("wide");
+    expect(hitAreas.farm).toEqual({ center: sites.farm, width: 0.22, height: 0.16 });
+    expect(hitAreas.lumberCamp.center).toEqual(sites.lumberCamp);
   });
 
   it("keeps narrow controls close to their landmarks", () => {
@@ -63,6 +83,15 @@ describe("world layout", () => {
     expect(ultrawideProjection.width).toBeGreaterThanOrEqual(2560);
     expect(ultrawideProjection.height).toBeGreaterThanOrEqual(1080);
     expect(ultrawideProjection.y + ultrawideProjection.height).toBeCloseTo(1080, 5);
+  });
+
+  it("covers a mobile viewport without exposing shell-colored margins", () => {
+    const projection = getWorldProjection({ width: 390, height: 844 }, "narrow");
+    expect(projection.width).toBeGreaterThanOrEqual(390);
+    expect(projection.height).toBeGreaterThanOrEqual(844);
+    expect(projection.x).toBeLessThanOrEqual(0);
+    expect(projection.x + projection.width).toBeGreaterThanOrEqual(390);
+    expect(projection.y + projection.height).toBeCloseTo(844, 5);
   });
 
   it("gives coworkers separate lanes and work positions", () => {

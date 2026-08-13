@@ -1,8 +1,9 @@
 import Phaser from "phaser";
 import type { GameState, WorkLocation } from "./model";
-import { createWorkerRoute, getBuildingHeight, getWorldLayout, getWorldProjection, PHASE_DURATION_MS, projectWorldPoint, type Point, type SiteName, type WorldMode, type WorkSite } from "./worldLayout";
+import { createWorkerRoute, getBuildingHeight, getWorldLayout, getWorldMode, getWorldProjection, PHASE_DURATION_MS, projectWorldPoint, type Point, type SiteName, type WorkSite } from "./worldLayout";
 import { getWideProgressionTextureKey, getWorldTextureKeys } from "./worldVisuals";
 import { getCelestialPosition } from "./skyCycle";
+import { getProgressionStage, PROGRESSION_CROSSFADE_MS, RESOURCE_POPUP_MS } from "./interactionMotion";
 
 interface SceneOptions {
   getState: () => GameState;
@@ -24,12 +25,11 @@ const BUILDING_ORIGINS: Record<SiteName, { x: number; y: number }> = {
   quarry: { x: .5, y: .8 }, castle: { x: .5, y: .89 },
 };
 
-const modeForWidth = (width: number): WorldMode => width < 680 ? "narrow" : "wide";
-
 export class KingdomScene extends Phaser.Scene {
   private options: SceneOptions;
   private currentState!: GameState;
   private buildings = new Map<SiteName, Phaser.GameObjects.Image>();
+  private hitZones = new Map<SiteName, Phaser.GameObjects.Zone>();
   private wideWorld?: Phaser.GameObjects.Image;
   private completedWorld?: Phaser.GameObjects.Image;
   private clouds: CloudView[] = [];
@@ -41,6 +41,7 @@ export class KingdomScene extends Phaser.Scene {
   private stars?: Phaser.GameObjects.Container;
   private townGlow?: Phaser.GameObjects.Arc;
   private isNight = false;
+  private resizeTimer?: Phaser.Time.TimerEvent;
 
   constructor(options: SceneOptions) {
     super("kingdom");
@@ -69,6 +70,12 @@ export class KingdomScene extends Phaser.Scene {
 
   create(): void {
     this.currentState = this.options.getState();
+    this.buildings.clear();
+    this.hitZones.clear();
+    this.villagers.clear();
+    this.clouds = [];
+    this.wideWorld = undefined;
+    this.completedWorld = undefined;
     this.phaseStartedAt = this.time.now;
     this.drawWorld();
     this.createAnimations();
@@ -82,13 +89,18 @@ export class KingdomScene extends Phaser.Scene {
       this.setNight(this.isNight);
       this.moveVillagers(true);
     } });
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this));
   }
 
   syncState(state: GameState): void {
+    const previousStage = this.currentState ? getProgressionStage(this.currentState) : getProgressionStage(state);
     this.currentState = state;
     if (!this.sys?.isActive()) return;
-    this.wideWorld?.setTexture(getWideProgressionTextureKey(state));
+    if (this.wideWorld && getProgressionStage(state) > previousStage) this.crossfadeWideWorld(state);
+    else this.wideWorld?.setTexture(getWideProgressionTextureKey(state));
     (["lumberCamp", "town", "quarry"] as const).forEach((name) => this.buildings.get(name)?.setVisible(state.unlocked[name]));
+    this.syncHitAreas();
     if (this.completedWorld) this.tweens.add({ targets: this.completedWorld, alpha: state.unlocked.castle ? 1 : 0, duration: this.options.reducedMotion ? 0 : 550 });
     const ids = new Set(state.villagers.map(({ id }) => id));
     this.villagers.forEach(({ sprite }, id) => { if (!ids.has(id)) { sprite.destroy(); this.villagers.delete(id); } });
@@ -103,19 +115,23 @@ export class KingdomScene extends Phaser.Scene {
   }
 
   emitResourceGain(location: Exclude<WorkLocation, "idle">, amount: number): void {
-    if (this.options.reducedMotion && amount < 2) return;
     const { width, height } = this.scale;
-    const mode = modeForWidth(width);
+    const mode = getWorldMode(width);
     const point = projectWorldPoint(getWorldLayout(mode).sites[location], { width, height }, mode);
     const label = this.add.text(point.x, point.y - 52, `+${amount}`, {
-      fontFamily: "Pixelify Sans, monospace", fontSize: "20px", color: "#fff2a6", stroke: "#352817", strokeThickness: 5,
+      fontFamily: "Pixelify Sans, monospace", fontSize: "24px", color: "#fff2a6", stroke: "#24180d", strokeThickness: 6,
     }).setOrigin(.5).setDepth(40);
-    this.tweens.add({ targets: label, y: label.y - 40, alpha: 0, duration: 1050, ease: "Cubic.Out", onComplete: () => label.destroy() });
+    if (this.options.reducedMotion) {
+      this.time.delayedCall(RESOURCE_POPUP_MS, () => label.destroy());
+      return;
+    }
+    this.tweens.add({ targets: label, y: label.y - 32, duration: RESOURCE_POPUP_MS, ease: "Sine.Out" });
+    this.tweens.add({ targets: label, alpha: 0, delay: 950, duration: RESOURCE_POPUP_MS - 950, onComplete: () => label.destroy() });
   }
 
   private drawWorld(): void {
     const { width, height } = this.scale;
-    const mode = modeForWidth(width);
+    const mode = getWorldMode(width);
     const projection = getWorldProjection({ width, height }, mode);
     const worldTextures = getWorldTextureKeys(mode);
     if (mode === "wide") {
@@ -137,11 +153,16 @@ export class KingdomScene extends Phaser.Scene {
       image.setScale(targetHeight / image.height);
       if (mode === "wide") image.setAlpha(.001);
       image.setVisible(name === "farm" || this.currentState.unlocked[name]);
-      if (name === "farm" || name === "lumberCamp" || name === "quarry") {
-        image.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 20 }).on("pointerdown", () => this.options.onGather(name));
-      }
       this.buildings.set(name, image);
     });
+    (Object.keys(layout.hitAreas) as SiteName[]).forEach((name) => {
+      const footprint = layout.hitAreas[name];
+      const point = projectWorldPoint(footprint.center, { width, height }, mode);
+      const zone = this.add.zone(point.x, point.y, footprint.width * projection.width, footprint.height * projection.mapHeight).setDepth(18);
+      if (name === "farm" || name === "lumberCamp" || name === "quarry") zone.on("pointerdown", () => this.options.onGather(name));
+      this.hitZones.set(name, zone);
+    });
+    this.syncHitAreas();
     this.stars = this.add.container(0, 0).setDepth(30).setAlpha(0);
     for (let index = 0; index < 34; index += 1) this.stars.add(this.add.rectangle((index * 83) % width, 18 + ((index * 47) % Math.max(40, height * .38)), index % 4 === 0 ? 2 : 1, index % 4 === 0 ? 2 : 1, 0xfff1bd));
     this.nightOverlay = this.add.rectangle(0, 0, width, height, 0x101b3d, 0).setOrigin(0).setDepth(25);
@@ -181,6 +202,7 @@ export class KingdomScene extends Phaser.Scene {
   }
 
   private createAnimations(): void {
+    if (this.anims.exists("walk-front")) return;
     this.anims.create({ key: "walk-front", frames: [0, 1, 2, 3].map((index) => ({ key: `villager-${index}` })), frameRate: 7, repeat: -1 });
     this.anims.create({ key: "walk-back", frames: [4, 5, 6, 7].map((index) => ({ key: `villager-${index}` })), frameRate: 7, repeat: -1 });
     this.anims.create({ key: "work-farm", frames: [8, 9, 10, 11].map((index) => ({ key: `villager-${index}` })), frameRate: 5, repeat: -1 });
@@ -194,7 +216,7 @@ export class KingdomScene extends Phaser.Scene {
   private createVillager(index: number, variant: "man" | "woman"): Phaser.GameObjects.Sprite {
     const { width, height } = this.scale;
     const texture = variant === "woman" ? "villager-woman-0" : "villager-0";
-    const mode = modeForWidth(width);
+    const mode = getWorldMode(width);
     const projection = getWorldProjection({ width, height }, mode);
     const spawn = projectWorldPoint(getWorldLayout(mode).townDoor, { width, height }, mode);
     const sprite = this.add.sprite(spawn.x, spawn.y, texture).setDepth(20).setScale(projection.mapHeight * .052 / 344);
@@ -207,7 +229,7 @@ export class KingdomScene extends Phaser.Scene {
   private moveVillagers(force = false): void {
     if (this.options.reducedMotion && !force) return;
     const { width, height } = this.scale;
-    const layout = getWorldLayout(modeForWidth(width));
+    const layout = getWorldLayout(getWorldMode(width));
     const groupIndex = new Map<WorkSite, number>();
     const assignedWorkers = this.currentState.villagers.filter(({ assignment }) => assignment !== "idle").length;
     if (!this.isNight) this.options.onWorkStatus(assignedWorkers === 0 || this.allWorkersAtWork());
@@ -253,7 +275,7 @@ export class KingdomScene extends Phaser.Scene {
 
   private walkRoute(view: VillagerView, route: Point[], onComplete?: () => void): void {
     const { width, height } = this.scale;
-    const mode = modeForWidth(width);
+    const mode = getWorldMode(width);
     view.moving = true;
     const next = (index: number) => {
       const point = route[index];
@@ -277,5 +299,36 @@ export class KingdomScene extends Phaser.Scene {
     this.tweens.add({ targets: this.stars, alpha: night ? .9 : 0, duration: 1800 });
     this.tweens.add({ targets: this.townGlow, fillAlpha: night && this.currentState.unlocked.town ? .28 : 0, duration: 1500 });
     this.options.onPhase(night ? "Night" : "Day");
+  }
+
+  private syncHitAreas(): void {
+    (["farm", "lumberCamp", "quarry"] as const).forEach((name) => {
+      const zone = this.hitZones.get(name);
+      if (!zone) return;
+      const enabled = name === "farm" || this.currentState.unlocked[name];
+      if (enabled && !zone.input) zone.setInteractive({ useHandCursor: true });
+      if (!enabled && zone.input) zone.disableInteractive();
+    });
+  }
+
+  private crossfadeWideWorld(state: GameState): void {
+    const outgoing = this.wideWorld;
+    if (!outgoing) return;
+    const incoming = this.add.image(outgoing.x, outgoing.y, getWideProgressionTextureKey(state))
+      .setDisplaySize(outgoing.displayWidth, outgoing.displayHeight).setDepth(outgoing.depth + 1).setAlpha(this.options.reducedMotion ? 1 : 0);
+    this.wideWorld = incoming;
+    if (this.options.reducedMotion) {
+      outgoing.destroy();
+      return;
+    }
+    this.tweens.add({
+      targets: incoming, alpha: 1, duration: PROGRESSION_CROSSFADE_MS, ease: "Sine.InOut",
+      onComplete: () => outgoing.destroy(),
+    });
+  }
+
+  private handleResize(): void {
+    this.resizeTimer?.remove(false);
+    this.resizeTimer = this.time.delayedCall(80, () => this.scene.restart());
   }
 }

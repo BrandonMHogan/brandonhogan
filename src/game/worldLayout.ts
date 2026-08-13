@@ -5,6 +5,9 @@ export type SiteName = "farm" | BuildLocation;
 export type WorkSite = "farm" | "lumberCamp" | "quarry";
 export type Viewport = { width: number; height: number };
 export type WorldMode = "wide" | "narrow";
+export type HitArea = { center: Point; width: number; height: number };
+
+export const getWorldMode = (width: number): WorldMode => width < 680 ? "narrow" : "wide";
 
 export const PHASE_DURATION_MS = 300_000;
 const MAP_SIZE: Record<WorldMode, Viewport> = {
@@ -29,12 +32,12 @@ export const getWorldProjection = (viewport: Viewport, mode: WorldMode) => {
     const y = viewport.height - height;
     return { x, y, width, height, scale, mapY: y, mapHeight: height };
   }
-  const heightScale = viewport.height * .955 / EXTENDED_ART_HEIGHT[mode];
-  const scale = Math.min(widthScale, heightScale);
+  const heightScale = viewport.height / EXTENDED_ART_HEIGHT[mode];
+  const scale = Math.max(widthScale, heightScale);
   const width = map.width * scale;
   const height = EXTENDED_ART_HEIGHT[mode] * scale;
   const x = (viewport.width - width) / 2;
-  const y = viewport.height - height - viewport.height * .025;
+  const y = viewport.height - height;
   const mapHeight = map.height * scale;
   const mapY = y + (EXTENDED_ART_HEIGHT[mode] - map.height) * scale;
   return { x, y, width, height, scale, mapY, mapHeight };
@@ -50,6 +53,7 @@ export interface WorldLayout {
   controls: Record<SiteName, Point>;
   buildControls: Record<BuildLocation, Point>;
   farmRestorePrompt: Point;
+  hitAreas: Record<SiteName, HitArea>;
   workPoints: Record<WorkSite, Point>;
   routes: Record<WorkSite, Point[]>;
   wanderPoints: Point[];
@@ -77,14 +81,21 @@ const wide = (): WorldLayout => {
       town: { x: 0.55, y: 0.76 }, quarry: { x: 0.76, y: 0.76 }, castle: { x: 0.73, y: 0.52 },
     },
     controls: {
-      farm: { x: 0.23, y: 0.86 }, lumberCamp: { x: 0.29, y: 0.63 },
-      town: { x: 0.55, y: 0.82 }, quarry: { x: 0.84, y: 0.79 }, castle: { x: 0.73, y: 0.44 },
+      farm: { x: 0.32, y: 0.9 }, lumberCamp: { x: 0.38, y: 0.625 },
+      town: { x: 0.55, y: 0.82 }, quarry: { x: 0.76, y: 0.82 }, castle: { x: 0.73, y: 0.44 },
     },
     buildControls: {
-      lumberCamp: { x: 0.38, y: 0.56 }, town: { x: 0.55, y: 0.69 },
-      quarry: { x: 0.76, y: 0.68 }, castle: { x: 0.73, y: 0.42 },
+      lumberCamp: { x: 0.38, y: 0.625 }, town: { x: 0.55, y: 0.69 },
+      quarry: { x: 0.76, y: 0.72 }, castle: { x: 0.73, y: 0.42 },
     },
     farmRestorePrompt: { x: 0.32, y: 0.69 },
+    hitAreas: {
+      farm: { center: { x: 0.32, y: 0.81 }, width: 0.22, height: 0.16 },
+      lumberCamp: { center: { x: 0.38, y: 0.61 }, width: 0.18, height: 0.14 },
+      town: { center: { x: 0.55, y: 0.76 }, width: 0.16, height: 0.14 },
+      quarry: { center: { x: 0.76, y: 0.76 }, width: 0.15, height: 0.14 },
+      castle: { center: { x: 0.73, y: 0.52 }, width: 0.16, height: 0.18 },
+    },
     workPoints,
     routes: {
       farm: [townDoor, { x: 0.49, y: 0.79 }, { x: 0.4, y: 0.8 }, workPoints.farm],
@@ -120,6 +131,13 @@ const narrow = (): WorldLayout => {
       quarry: { x: 0.71, y: 0.68 }, castle: { x: 0.73, y: 0.31 },
     },
     farmRestorePrompt: { x: 0.17, y: 0.61 },
+    hitAreas: {
+      farm: { center: { x: 0.17, y: 0.716 }, width: 0.28, height: 0.14 },
+      lumberCamp: { center: { x: 0.2, y: 0.4 }, width: 0.28, height: 0.13 },
+      town: { center: { x: 0.5, y: 0.54 }, width: 0.25, height: 0.13 },
+      quarry: { center: { x: 0.808, y: 0.692 }, width: 0.24, height: 0.14 },
+      castle: { center: { x: 0.73, y: 0.39 }, width: 0.26, height: 0.15 },
+    },
     workPoints,
     routes: {
       farm: [townDoor, { x: .45, y: .64 }, { x: .36, y: .69 }, workPoints.farm],

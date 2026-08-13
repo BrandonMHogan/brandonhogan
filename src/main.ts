@@ -2,8 +2,9 @@ import "./styles.css";
 import { advanceGame, BUILD_COSTS, createInitialState, getProductionRates, getRecruitCost, MAX_VILLAGERS, reduceGame, type BuildLocation, type GameAction, type GameState, type WorkLocation } from "./game/model";
 import { createKingdom, type KingdomController } from "./game/createKingdom";
 import { loadGame, resetGame, saveGame } from "./game/storage";
-import { getWorldLayout, projectWorldPoint, type SiteName } from "./game/worldLayout";
+import { getWorldLayout, getWorldMode, projectWorldPoint, type SiteName } from "./game/worldLayout";
 import { getVisibleWorldControls } from "./game/controlVisibility";
+import { CONTROL_REVEAL_DELAY_MS, getProgressionStage } from "./game/interactionMotion";
 
 const $ = <T extends HTMLElement>(selector: string): T => {
   const element = document.querySelector<T>(selector);
@@ -12,6 +13,7 @@ const $ = <T extends HTMLElement>(selector: string): T => {
 };
 
 const controls = $("#controls");
+const gameMount = $("#game");
 const status = $("#status");
 const values = {
   food: $("#food"), wood: $("#wood"), stone: $("#stone"), population: $("#population"),
@@ -21,18 +23,21 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let state: GameState = loadGame(localStorage);
 let kingdom: KingdomController | undefined;
 let workersAtWork = true;
+let controlsRevealAt = 0;
+let controlsEnteringUntil = 0;
+let lastControlsMarkup = "";
 
 const positioned = (name: SiteName, build = false) => {
-  const mode = matchMedia("(max-width: 680px)").matches ? "narrow" : "wide";
+  const mode = getWorldMode(gameMount.clientWidth);
   const layout = getWorldLayout(mode);
   const point = build && name !== "farm" ? layout.buildControls[name] : layout.controls[name];
-  const screen = projectWorldPoint(point, { width: innerWidth, height: innerHeight }, mode);
+  const screen = projectWorldPoint(point, { width: gameMount.clientWidth, height: gameMount.clientHeight }, mode);
   return `style="left:${screen.x}px;top:${screen.y}px"`;
 };
 
 const farmRestorePosition = () => {
-  const mode = matchMedia("(max-width: 680px)").matches ? "narrow" : "wide";
-  const screen = projectWorldPoint(getWorldLayout(mode).farmRestorePrompt, { width: innerWidth, height: innerHeight }, mode);
+  const mode = getWorldMode(gameMount.clientWidth);
+  const screen = projectWorldPoint(getWorldLayout(mode).farmRestorePrompt, { width: gameMount.clientWidth, height: gameMount.clientHeight }, mode);
   return `style="left:${screen.x}px;top:${screen.y}px"`;
 };
 
@@ -43,11 +48,17 @@ const affordable = (location: BuildLocation) => Object.entries(BUILD_COSTS[locat
 const requirementText = (location: BuildLocation) => Object.entries(BUILD_COSTS[location]).filter(([, amount]) => amount > 0).map(([resource, amount]) => `${format(amount)} ${resource}`).join(" · ");
 
 const setState = (next: GameState, announcement?: string) => {
+  const progressionChanged = getProgressionStage(next) > getProgressionStage(state);
+  if (progressionChanged && !reducedMotion) {
+    controlsRevealAt = Date.now() + CONTROL_REVEAL_DELAY_MS;
+    controlsEnteringUntil = controlsRevealAt + 350;
+  }
   state = next;
   state.lastUpdatedAt = Date.now();
   saveGame(localStorage, state);
   render();
   kingdom?.updateState(state);
+  if (progressionChanged && !reducedMotion) window.setTimeout(render, CONTROL_REVEAL_DELAY_MS);
   if (announcement) status.textContent = announcement;
 };
 
@@ -74,16 +85,19 @@ const render = () => {
   values.wood.textContent = format(state.resources.wood);
   values.stone.textContent = format(state.resources.stone);
   values.population.textContent = `${state.villagers.length} (${idleCount()} idle)`;
+  if (Date.now() < controlsRevealAt) return;
+  const entering = Date.now() < controlsEnteringUntil ? " is-entering" : "";
   const visibleControls = getVisibleWorldControls(state);
   if (visibleControls[0] === "farmRestore") {
-    controls.innerHTML = `<div class="site-control restore-farm-prompt" ${farmRestorePosition()}><span>Click the Farm</span></div>`;
+    const markup = `<div class="site-control restore-farm-prompt${entering}" ${farmRestorePosition()}><span>Click the Farm</span></div>`;
+    if (markup !== lastControlsMarkup) { controls.innerHTML = markup; lastControlsMarkup = markup; }
     return;
   }
   const progression: Array<[BuildLocation, string]> = [
     ["lumberCamp", "Lumber Camp"], ["town", "Town"], ["quarry", "Quarry"], ["castle", "Castle"],
   ];
   const nextLocked = progression.find(([location]) => !state.unlocked[location]);
-  controls.innerHTML = [
+  const markup = [
     workerControl("farm", "Farm"),
     state.unlocked.lumberCamp ? workerControl("lumberCamp", "Lumber Camp") : nextLocked?.[0] === "lumberCamp" ? buildControl(...nextLocked) : "",
     state.unlocked.town ? `<div class="site-control site-town" ${positioned("town")}><strong>Town</strong>${state.villagers.length >= MAX_VILLAGERS
@@ -91,7 +105,8 @@ const render = () => {
       : `<button data-recruit="true" ${state.resources.food < getRecruitCost(state) ? "disabled" : ""}>Recruit · ${getRecruitCost(state)} food</button>`}</div>` : nextLocked?.[0] === "town" ? buildControl(...nextLocked) : "",
     state.unlocked.quarry ? workerControl("quarry", "Quarry") : nextLocked?.[0] === "quarry" ? buildControl(...nextLocked) : "",
     state.unlocked.castle ? `<div class="site-control site-castle" ${positioned("castle")}><strong>Castle complete</strong><small>Your tiny kingdom prospers.</small></div>` : nextLocked?.[0] === "castle" ? buildControl(...nextLocked) : "",
-  ].join("");
+  ].join("").replaceAll('class="site-control ', `class="site-control${entering} `);
+  if (markup !== lastControlsMarkup) { controls.innerHTML = markup; lastControlsMarkup = markup; }
 };
 
 controls.addEventListener("click", (event) => {
@@ -125,11 +140,11 @@ const gather = (location: Exclude<WorkLocation, "idle">) => {
 
 render();
 let resizeRenderTimer = 0;
-addEventListener("resize", () => {
+new ResizeObserver(() => {
   window.clearTimeout(resizeRenderTimer);
   resizeRenderTimer = window.setTimeout(render, 80);
-});
-createKingdom($("#game"), {
+}).observe(gameMount);
+createKingdom(gameMount, {
   getState: () => state,
   onGather: gather,
   reducedMotion,
