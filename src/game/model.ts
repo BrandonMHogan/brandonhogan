@@ -8,7 +8,8 @@ export interface Villager {
 }
 
 export interface GameState {
-  version: 1;
+  version: 2;
+  farmRestored: boolean;
   resources: Record<Resource, number>;
   unlocked: { farm: true; lumberCamp: boolean; town: boolean; quarry: boolean; castle: boolean };
   villagers: Villager[];
@@ -39,7 +40,8 @@ const RATES: Record<Exclude<WorkLocation, "idle">, { resource: Resource; perSeco
 };
 
 export const createInitialState = (now = Date.now()): GameState => ({
-  version: 1,
+  version: 2,
+  farmRestored: false,
   resources: { food: 0, wood: 0, stone: 0 },
   unlocked: { farm: true, lumberCamp: false, town: false, quarry: false, castle: false },
   villagers: [],
@@ -66,6 +68,10 @@ export const reduceGame = (state: GameState, action: GameAction): GameState => {
   const next = clone(state);
   if (action.type === "gather") {
     if (!next.unlocked[action.location]) return state;
+    if (action.location === "farm" && !next.farmRestored) {
+      next.farmRestored = true;
+      return next;
+    }
     const rate = RATES[action.location];
     next.resources[rate.resource] += 1;
     return next;

@@ -2,8 +2,19 @@ import { describe, expect, it } from "vitest";
 import { advanceGame, createInitialState, getRecruitCost, MAX_VILLAGERS, reduceGame } from "./model";
 
 describe("game model", () => {
+  it("restores the farm for free on the first click", () => {
+    const initial = createInitialState(100);
+    const restored = reduceGame(initial, { type: "gather", location: "farm" });
+
+    expect(initial.farmRestored).toBe(false);
+    expect(restored.farmRestored).toBe(true);
+    expect(restored.resources.food).toBe(0);
+  });
+
   it("gathers food at the farm", () => {
-    const next = reduceGame(createInitialState(100), { type: "gather", location: "farm" });
+    const state = createInitialState(100);
+    state.farmRestored = true;
+    const next = reduceGame(state, { type: "gather", location: "farm" });
     expect(next.resources.food).toBe(1);
   });
 

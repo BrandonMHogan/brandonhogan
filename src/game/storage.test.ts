@@ -21,6 +21,23 @@ describe("game storage", () => {
     expect(loadGame(storage, 200).resources.food).toBe(42);
   });
 
+  it("migrates existing version-one saves to a restored farm", () => {
+    const storage = memoryStorage();
+    storage.setItem(SAVE_KEY, JSON.stringify({
+      version: 1,
+      resources: { food: 42, wood: 3, stone: 2 },
+      unlocked: { farm: true, lumberCamp: false, town: false, quarry: false, castle: false },
+      villagers: [],
+      lastUpdatedAt: 100,
+    }));
+
+    const loaded = loadGame(storage, 200);
+
+    expect(loaded.version).toBe(2);
+    expect(loaded.farmRestored).toBe(true);
+    expect(loaded.resources.food).toBe(42);
+  });
+
   it("falls back safely when persisted data is invalid", () => {
     const storage = memoryStorage();
     storage.setItem(SAVE_KEY, "not-json");

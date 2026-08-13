@@ -3,6 +3,7 @@ import { advanceGame, BUILD_COSTS, createInitialState, getProductionRates, getRe
 import { createKingdom, type KingdomController } from "./game/createKingdom";
 import { loadGame, resetGame, saveGame } from "./game/storage";
 import { getWorldLayout, projectWorldPoint, type SiteName } from "./game/worldLayout";
+import { getVisibleWorldControls } from "./game/controlVisibility";
 
 const $ = <T extends HTMLElement>(selector: string): T => {
   const element = document.querySelector<T>(selector);
@@ -26,6 +27,12 @@ const positioned = (name: SiteName, build = false) => {
   const layout = getWorldLayout(mode);
   const point = build && name !== "farm" ? layout.buildControls[name] : layout.controls[name];
   const screen = projectWorldPoint(point, { width: innerWidth, height: innerHeight }, mode);
+  return `style="left:${screen.x}px;top:${screen.y}px"`;
+};
+
+const farmRestorePosition = () => {
+  const mode = matchMedia("(max-width: 680px)").matches ? "narrow" : "wide";
+  const screen = projectWorldPoint(getWorldLayout(mode).farmRestorePrompt, { width: innerWidth, height: innerHeight }, mode);
   return `style="left:${screen.x}px;top:${screen.y}px"`;
 };
 
@@ -67,6 +74,11 @@ const render = () => {
   values.wood.textContent = format(state.resources.wood);
   values.stone.textContent = format(state.resources.stone);
   values.population.textContent = `${state.villagers.length} (${idleCount()} idle)`;
+  const visibleControls = getVisibleWorldControls(state);
+  if (visibleControls[0] === "farmRestore") {
+    controls.innerHTML = `<div class="site-control restore-farm-prompt" ${farmRestorePosition()}><span>Click the Farm</span></div>`;
+    return;
+  }
   const progression: Array<[BuildLocation, string]> = [
     ["lumberCamp", "Lumber Camp"], ["town", "Town"], ["quarry", "Quarry"], ["castle", "Castle"],
   ];
@@ -98,9 +110,14 @@ $("#reset").addEventListener("click", () => {
 });
 
 const gather = (location: Exclude<WorkLocation, "idle">) => {
+  const restoringFarm = location === "farm" && !state.farmRestored;
   const before = state.resources;
   const next = reduceGame(state, { type: "gather", location });
   if (next === state) return;
+  if (restoringFarm) {
+    setState(next, "Farm restored");
+    return;
+  }
   const resource = location === "farm" ? "food" : location === "lumberCamp" ? "wood" : "stone";
   kingdom?.emitResourceGain(location, next.resources[resource] - before[resource]);
   setState(next, `Gathered 1 ${resource}`);

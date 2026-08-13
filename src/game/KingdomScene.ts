@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 import type { GameState, WorkLocation } from "./model";
 import { createWorkerRoute, getBuildingHeight, getWorldLayout, getWorldProjection, PHASE_DURATION_MS, projectWorldPoint, type Point, type SiteName, type WorldMode, type WorkSite } from "./worldLayout";
-import { getWorldTextureKeys } from "./worldVisuals";
+import { getWideProgressionTextureKey, getWorldTextureKeys } from "./worldVisuals";
+import { getCelestialPosition } from "./skyCycle";
 
 interface SceneOptions {
   getState: () => GameState;
@@ -12,6 +13,7 @@ interface SceneOptions {
 }
 
 type VillagerView = { sprite: Phaser.GameObjects.Sprite; assignment: WorkLocation; variant: "man" | "woman"; moving: boolean; wanderStep: number; destination: "none" | "work" | "town"; departure?: Phaser.Time.TimerEvent };
+type CloudView = { image: Phaser.GameObjects.Image; speed: number };
 
 const BUILDING_TEXTURES: Record<SiteName, string> = {
   farm: "building-0", lumberCamp: "building-1", town: "building-2", quarry: "building-3-family", castle: "building-4-family",
@@ -28,7 +30,12 @@ export class KingdomScene extends Phaser.Scene {
   private options: SceneOptions;
   private currentState!: GameState;
   private buildings = new Map<SiteName, Phaser.GameObjects.Image>();
+  private wideWorld?: Phaser.GameObjects.Image;
   private completedWorld?: Phaser.GameObjects.Image;
+  private clouds: CloudView[] = [];
+  private sun?: Phaser.GameObjects.Image;
+  private moon?: Phaser.GameObjects.Image;
+  private phaseStartedAt = 0;
   private villagers = new Map<string, VillagerView>();
   private nightOverlay?: Phaser.GameObjects.Rectangle;
   private stars?: Phaser.GameObjects.Container;
@@ -41,10 +48,19 @@ export class KingdomScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image("world-empty", "/assets/game/kingdom/world-empty-extended.webp");
-    this.load.image("world-castle", "/assets/game/kingdom/world-castle-extended.webp");
-    this.load.image("world-mobile-empty", "/assets/game/kingdom/world-mobile-empty-extended.webp");
-    this.load.image("world-mobile-castle", "/assets/game/kingdom/world-mobile-castle-extended.webp");
+    this.load.image("world-empty", "/assets/game/kingdom/world-empty-sky-clean.webp");
+    this.load.image("world-castle", "/assets/game/kingdom/world-castle-sky-clean.webp");
+    this.load.image("world-mobile-empty", "/assets/game/kingdom/world-mobile-empty-sky-clean.webp");
+    this.load.image("world-mobile-castle", "/assets/game/kingdom/world-mobile-castle-sky-clean.webp");
+    for (let index = 0; index < 6; index += 1) this.load.image(`cloud-${index}`, `/assets/game/kingdom/cloud-${index}.webp`);
+    this.load.image("sun", "/assets/game/kingdom/sun.webp");
+    this.load.image("moon", "/assets/game/kingdom/moon.webp");
+    this.load.image("wide-farm-decrepit", "/assets/game/kingdom/wide-farm-decrepit-v1.webp");
+    this.load.image("wide-through-farm", "/assets/game/kingdom/wide-through-farm-v1.webp");
+    this.load.image("wide-through-lumber", "/assets/game/kingdom/wide-through-lumber-v1.webp");
+    this.load.image("wide-through-town", "/assets/game/kingdom/wide-through-town-v3.webp");
+    this.load.image("wide-through-quarry", "/assets/game/kingdom/wide-through-quarry-v1.webp");
+    this.load.image("wide-full", "/assets/game/kingdom/wide-full-approved-v1.webp");
     for (let index = 0; index < 4; index += 1) this.load.image(`building-${index}`, `/assets/game/kingdom/building-${index}.webp`);
     this.load.image("building-3-family", "/assets/game/kingdom/building-3-family.webp");
     for (let index = 0; index < 16; index += 1) this.load.image(`villager-${index}`, `/assets/game/kingdom/villager-${String(index).padStart(2, "0")}.webp`);
@@ -53,6 +69,7 @@ export class KingdomScene extends Phaser.Scene {
 
   create(): void {
     this.currentState = this.options.getState();
+    this.phaseStartedAt = this.time.now;
     this.drawWorld();
     this.createAnimations();
     this.syncState(this.currentState);
@@ -61,6 +78,7 @@ export class KingdomScene extends Phaser.Scene {
     this.time.addEvent({ delay: 2200, loop: true, callback: () => this.moveVillagers() });
     this.time.addEvent({ delay: PHASE_DURATION_MS, loop: true, callback: () => {
       this.isNight = !this.isNight;
+      this.phaseStartedAt = this.time.now;
       this.setNight(this.isNight);
       this.moveVillagers(true);
     } });
@@ -69,6 +87,7 @@ export class KingdomScene extends Phaser.Scene {
   syncState(state: GameState): void {
     this.currentState = state;
     if (!this.sys?.isActive()) return;
+    this.wideWorld?.setTexture(getWideProgressionTextureKey(state));
     (["lumberCamp", "town", "quarry"] as const).forEach((name) => this.buildings.get(name)?.setVisible(state.unlocked[name]));
     if (this.completedWorld) this.tweens.add({ targets: this.completedWorld, alpha: state.unlocked.castle ? 1 : 0, duration: this.options.reducedMotion ? 0 : 550 });
     const ids = new Set(state.villagers.map(({ id }) => id));
@@ -99,9 +118,15 @@ export class KingdomScene extends Phaser.Scene {
     const mode = modeForWidth(width);
     const projection = getWorldProjection({ width, height }, mode);
     const worldTextures = getWorldTextureKeys(mode);
-    this.add.image(width / 2, projection.y + projection.height / 2, worldTextures.empty).setDisplaySize(projection.width, projection.height).setDepth(0);
-    this.completedWorld = this.add.image(width / 2, projection.y + projection.height / 2, worldTextures.completed)
-      .setDisplaySize(projection.width, projection.height).setDepth(1).setAlpha(this.currentState.unlocked.castle ? 1 : 0);
+    if (mode === "wide") {
+      this.wideWorld = this.add.image(projection.x + projection.width / 2, projection.y + projection.height / 2, getWideProgressionTextureKey(this.currentState))
+        .setDisplaySize(projection.width, projection.height).setDepth(0);
+    } else {
+      this.add.image(width / 2, projection.y + projection.height / 2, worldTextures.empty).setDisplaySize(projection.width, projection.height).setDepth(0);
+      this.completedWorld = this.add.image(width / 2, projection.y + projection.height / 2, worldTextures.completed)
+        .setDisplaySize(projection.width, projection.height).setDepth(1).setAlpha(this.currentState.unlocked.castle ? 1 : 0);
+    }
+    this.drawSky();
     const layout = getWorldLayout(mode);
     (Object.keys(layout.sites) as SiteName[]).forEach((name) => {
       if (name === "castle") return;
@@ -110,6 +135,7 @@ export class KingdomScene extends Phaser.Scene {
       const image = this.add.image(point.x, point.y, BUILDING_TEXTURES[name]).setOrigin(origin.x, origin.y).setDepth(12);
       const targetHeight = projection.mapHeight * getBuildingHeight(name, mode);
       image.setScale(targetHeight / image.height);
+      if (mode === "wide") image.setAlpha(.001);
       image.setVisible(name === "farm" || this.currentState.unlocked[name]);
       if (name === "farm" || name === "lumberCamp" || name === "quarry") {
         image.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 20 }).on("pointerdown", () => this.options.onGather(name));
@@ -121,6 +147,37 @@ export class KingdomScene extends Phaser.Scene {
     this.nightOverlay = this.add.rectangle(0, 0, width, height, 0x101b3d, 0).setOrigin(0).setDepth(25);
     const town = projectWorldPoint(layout.sites.town, { width, height }, mode);
     this.townGlow = this.add.circle(town.x, town.y - 10, projection.mapHeight * .1, 0xffb84d, 0).setDepth(26);
+  }
+
+  update(time: number, delta: number): void {
+    const { width, height } = this.scale;
+    if (!this.options.reducedMotion) this.clouds.forEach(({ image, speed }) => {
+      image.x += speed * delta / 1000;
+      if (image.x - image.displayWidth / 2 > width + 60) image.x = -image.displayWidth / 2 - 80;
+    });
+    const progress = this.options.reducedMotion ? .5 : (time - this.phaseStartedAt) / PHASE_DURATION_MS;
+    const active = this.isNight ? this.moon : this.sun;
+    const inactive = this.isNight ? this.sun : this.moon;
+    if (active) {
+      const position = getCelestialPosition(progress, width, height);
+      active.setPosition(position.x, position.y).setAlpha(1);
+    }
+    inactive?.setAlpha(0);
+  }
+
+  private drawSky(): void {
+    const { width, height } = this.scale;
+    const cloudConfig = [
+      { texture: 0, x: .08, y: .18, scale: .62, speed: 2.4 }, { texture: 2, x: .58, y: .13, scale: .54, speed: 2.1 },
+      { texture: 1, x: .84, y: .27, scale: .56, speed: 2.7 }, { texture: 3, x: .24, y: .36, scale: .7, speed: 5.2 },
+      { texture: 4, x: .68, y: .32, scale: .62, speed: 4.6 }, { texture: 5, x: -.04, y: .43, scale: .58, speed: 5.7 },
+    ];
+    this.clouds = cloudConfig.map(({ texture, x, y, scale, speed }, index) => {
+      const image = this.add.image(width * x, height * y, `cloud-${texture}`).setScale(scale).setAlpha(index < 3 ? .6 : .84).setDepth(3);
+      return { image, speed };
+    });
+    this.sun = this.add.image(0, 0, "sun").setScale(.52).setDepth(2);
+    this.moon = this.add.image(0, 0, "moon").setScale(.5).setDepth(2).setAlpha(0);
   }
 
   private createAnimations(): void {

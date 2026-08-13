@@ -30,3 +30,24 @@ WebP maps and sprites in this folder.
 
 The castle in the extended completed maps is painted directly into the hilltop;
 it is not loaded as a separate runtime sprite.
+
+The `*-sky-clean.webp` world pairs remove baked upper-sky clouds. Runtime sky
+motion uses `cloud-0.webp` through `cloud-5.webp` in two parallax bands plus
+`sun.webp` and `moon.webp`, whose arc is synchronized to the five-minute phase.
+
+`master-wide-full-approved.webp` is the approved fully built wide progression
+master (`3840×1917`). Earlier building states must be derived from this exact
+composition without changing its crop, scale, terrain, or unaffected pixels.
+
+The integrated wide runtime progression uses six high-quality `3840×1917` WebPs;
+the exact approved PNG masters remain in `assets/game-source/kingdom/`:
+
+1. `wide-farm-decrepit-v1.webp`: initial repairable Farm.
+2. `wide-through-farm-v1.webp`: restored Farm.
+3. `wide-through-lumber-v1.webp`: Farm and Lumber Camp.
+4. `wide-through-town-v3.webp`: Farm, Lumber Camp, and Town.
+5. `wide-through-quarry-v1.webp`: Farm, Lumber Camp, Town, and Quarry.
+6. `wide-full-approved-v1.webp`: fully built kingdom with Castle.
+
+The first Farm click restores the Farm for free. Narrow/mobile mode continues
+to use the existing layered world and standalone building assets.

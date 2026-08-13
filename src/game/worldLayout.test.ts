@@ -15,13 +15,13 @@ describe("world layout", () => {
 
   it("places wide controls beside their landmarks on readable terrain", () => {
     const controls = getWorldLayout("wide").controls;
-    expect(controls.farm).toEqual({ x: 0.14, y: 0.84 });
-    expect(controls.lumberCamp).toEqual({ x: 0.2, y: 0.555 });
-    expect(controls.town).toEqual({ x: 0.5, y: 0.72 });
-    expect(controls.quarry).toEqual({ x: 0.755, y: 0.66 });
-    expect(controls.castle).toEqual({ x: 0.82, y: 0.46 });
-    expect(getWorldLayout("wide").buildControls.quarry).toEqual({ x: 0.755, y: 0.61 });
-    expect(getWorldLayout("wide").buildControls.castle).toEqual({ x: 0.82, y: 0.26 });
+    expect(controls.farm).toEqual({ x: 0.23, y: 0.86 });
+    expect(controls.lumberCamp).toEqual({ x: 0.29, y: 0.63 });
+    expect(controls.town).toEqual({ x: 0.55, y: 0.82 });
+    expect(controls.quarry).toEqual({ x: 0.84, y: 0.79 });
+    expect(controls.castle).toEqual({ x: 0.73, y: 0.44 });
+    expect(getWorldLayout("wide").buildControls.quarry).toEqual({ x: 0.76, y: 0.68 });
+    expect(getWorldLayout("wide").buildControls.castle).toEqual({ x: 0.73, y: 0.42 });
   });
 
   it("keeps narrow controls close to their landmarks", () => {
@@ -44,21 +44,25 @@ describe("world layout", () => {
     expect(new Set(layout.wanderPoints.map(({ x, y }) => `${x},${y}`)).size).toBeGreaterThanOrEqual(5);
   });
 
-  it("projects points against the unchanged lower map inside the extended artwork", () => {
+  it("projects points against the approved 3840 by 1917 wide artwork", () => {
     const projection = getWorldProjection({ width: 1200, height: 1000 }, "wide");
-    expect(projection.height).toBeCloseTo(1004.78, 2);
-    expect(projection.mapY).toBeCloseTo(324.64, 2);
-    expect(projection.mapHeight).toBeCloseTo(675.36, 2);
+    expect(projection.width).toBeGreaterThanOrEqual(1200);
+    expect(projection.height).toBeGreaterThanOrEqual(1000);
+    expect(projection.y + projection.height).toBeCloseTo(1000, 5);
+    expect(projection.y).toBeLessThanOrEqual(0);
+    expect(projection.mapY).toBeCloseTo(0, 5);
+    expect(projection.mapHeight).toBeCloseTo(1000, 5);
+    expect(projectWorldPoint({ x: 0.55, y: 0.5 }, { width: 1200, height: 1000 }, "wide").x).toBeCloseTo(600, 5);
     const tall = projectWorldPoint({ x: 1, y: 1 }, { width: 1200, height: 1000 }, "wide");
     const origin = projectWorldPoint({ x: 0, y: 0 }, { width: 1200, height: 1000 }, "wide");
-    expect((tall.x - origin.x) / (tall.y - origin.y)).toBeCloseTo(1672 / 941, 5);
-    expect(tall.y).toBe(1000);
-    expect(origin.y).toBeCloseTo(324.64, 1);
+    expect((tall.x - origin.x) / (tall.y - origin.y)).toBeCloseTo(3840 / 1917, 5);
+    expect(tall.y).toBeCloseTo(1000, 0);
+    expect(origin.y).toBeCloseTo(0, 0);
 
-    const ultrawide = projectWorldPoint({ x: 1, y: 1 }, { width: 2560, height: 1080 }, "wide");
-    expect(ultrawide.y).toBe(1080);
-    expect(ultrawide.x).toBe(2560);
-    expect(projectWorldPoint({ x: 0, y: 0 }, { width: 2560, height: 1080 }, "wide").y).toBeCloseTo(-360.8, 1);
+    const ultrawideProjection = getWorldProjection({ width: 2560, height: 1080 }, "wide");
+    expect(ultrawideProjection.width).toBeGreaterThanOrEqual(2560);
+    expect(ultrawideProjection.height).toBeGreaterThanOrEqual(1080);
+    expect(ultrawideProjection.y + ultrawideProjection.height).toBeCloseTo(1080, 5);
   });
 
   it("gives coworkers separate lanes and work positions", () => {
@@ -77,12 +81,12 @@ describe("world layout", () => {
   });
 
   it("anchors the castle entrance at the end of the hill road", () => {
-    expect(getWorldLayout("wide").sites.castle).toEqual({ x: 0.82, y: 0.37 });
+    expect(getWorldLayout("wide").sites.castle).toEqual({ x: 0.73, y: 0.52 });
     expect(getWorldLayout("narrow").sites.castle.y).toBeGreaterThanOrEqual(0.38);
   });
 
   it("lowers the quarry entrance toward its road", () => {
-    expect(getWorldLayout("wide").sites.quarry).toEqual({ x: 0.863, y: 0.65 });
+    expect(getWorldLayout("wide").sites.quarry).toEqual({ x: 0.76, y: 0.76 });
     expect(getWorldLayout("narrow").sites.quarry).toEqual({ x: 0.808, y: 0.692 });
   });
 
@@ -96,8 +100,8 @@ describe("world layout", () => {
 
   it("moves the farm down and castle right within their plots", () => {
     const sites = getWorldLayout("wide").sites;
-    expect(sites.farm).toEqual({ x: 0.14, y: 0.746 });
-    expect(sites.castle).toEqual({ x: 0.82, y: 0.37 });
+    expect(sites.farm).toEqual({ x: 0.32, y: 0.81 });
+    expect(sites.castle).toEqual({ x: 0.73, y: 0.52 });
   });
 
   it("moves the narrow castle controls with the castle", () => {
